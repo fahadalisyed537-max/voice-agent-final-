@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Real Estate Voice Assistant</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script src="https://js.puter.com/v2/"></script>
+<style>
+  :root {
+    --ink: #141414;
+    --ink-soft: #262626;
+    --text-muted: #707070;
+    --text-faint: #adadad;
+    --canvas: #ffffff;
+    --canvas-soft: #f3f3f3;
+    --field: #f0f0f0;
+    --hairline-soft: #f0f0f0;
+    --hairline: #e0e0e0;
+    --accent: #0066ff;
+    --on-primary: #ffffff;
+    --font: -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; background: var(--canvas); color: var(--ink);
+    font-family: var(--font);
+  }
+  body { display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px 16px 60px; }
+
+  /* ---------- Nav pill ---------- */
+  .nav-pill {
+    width: 100%; max-width: 640px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--canvas-soft); border-radius: 9999px;
+    padding: 10px 10px 10px 20px;
+  }
+  .nav-title { font-weight: 650; font-size: 16px; letter-spacing: 0; }
+  .nav-title span { color: var(--text-muted); font-weight: 456; }
+  .btn {
+    font-family: var(--font); font-weight: 600; font-size: 14px;
+    border-radius: 9999px; cursor: pointer; border: none;
+    padding: 10px 18px; line-height: 1;
+  }
+  .btn-primary { background: var(--ink); color: var(--on-primary); }
+  .btn-outline { background: var(--canvas); color: var(--ink); border: 1px solid var(--hairline); }
+  .btn-soft { background: var(--canvas-soft); color: var(--ink); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  #browserWarn { color: #b45309; font-size: 12px; margin-top: 8px; display: none; max-width: 560px; text-align: center; }
+
+  /* ---------- Orb card ---------- */
+  .orb-card {
+    margin-top: 28px; width: 100%; max-width: 560px;
+    background: var(--canvas); border: 1px solid var(--hairline-soft); border-radius: 24px;
+    padding: 48px 24px 36px; display: flex; flex-direction: column; align-items: center;
+  }
+  .sphere-stage { width: 160px; height: 160px; display: flex; align-items: center; justify-content: center; position: relative; }
+  .sphere-glow {
+    position: absolute; width: 150px; height: 150px; border-radius: 50%;
+    filter: blur(34px); opacity: 0.28; background: radial-gradient(circle, var(--accent), transparent 72%);
+    transition: opacity 0.35s ease;
+  }
+  .sphere {
+    width: 118px; height: 118px; border-radius: 50%; position: relative;
+    background: radial-gradient(circle at 32% 28%, rgba(255,255,255,0.9), transparent 45%), var(--ink);
+    transition: box-shadow 0.35s ease, background 0.35s ease;
+    animation: idleBreathe 4.5s ease-in-out infinite;
+  }
+  @keyframes idleBreathe { 0%,100% { transform: scale(1);} 50% { transform: scale(1.035);} }
+  @keyframes listeningPulse { 0%,100% { transform: scale(1);} 50% { transform: scale(1.09);} }
+  @keyframes thinkingPulse { 0%,100% { opacity: 1;} 50% { opacity: 0.55;} }
+  @keyframes speakingBounce { 0%,100% { transform: scale(1);} 25% { transform: scale(1.045);} 50% { transform: scale(0.975);} 75% { transform: scale(1.05);} }
+
+  .sphere-stage.listening .sphere { background: radial-gradient(circle at 32% 28%, rgba(255,255,255,0.9), transparent 45%), var(--accent); animation: listeningPulse 1.1s ease-in-out infinite; }
+  .sphere-stage.listening .sphere-glow { opacity: 0.5; }
+  .sphere-stage.thinking .sphere { animation: thinkingPulse 1.3s ease-in-out infinite; }
+  .sphere-stage.thinking .sphere-glow { opacity: 0.2; }
+  .sphere-stage.speaking .sphere { background: radial-gradient(circle at 32% 28%, rgba(255,255,255,0.9), transparent 45%), var(--accent); animation: speakingBounce 0.5s ease-in-out infinite; }
+  .sphere-stage.speaking .sphere-glow { opacity: 0.5; }
+  .sphere-stage.privacy .sphere { animation: none; background: var(--text-faint); }
+  .sphere-stage.privacy .sphere-glow { opacity: 0.05; }
+
+  #status { margin-top: 20px; color: var(--text-muted); font-size: 14px; font-weight: 456; min-height: 18px; }
+  .controls { display: flex; gap: 10px; margin-top: 20px; }
+
+  /* ---------- Transcript / lead card ---------- */
+  #transcript {
+    margin-top: 20px; width: 100%; max-width: 560px; max-height: 300px; overflow-y: auto;
+    background: var(--canvas); border: 1px solid var(--hairline-soft); border-radius: 16px;
+    padding: 16px 18px; font-size: 14px; line-height: 1.5;
+  }
+  .msg-user { color: var(--accent); margin-bottom: 8px; }
+  .msg-agent { color: var(--ink); margin-bottom: 8px; }
+  .msg-user b, .msg-agent b { color: var(--text-muted); font-weight: 600; }
+
+  #leadCard {
+    margin-top: 16px; width: 100%; max-width: 560px;
+    background: var(--canvas-soft); border-radius: 16px; padding: 16px 18px; display: none;
+  }
+  #leadCard h3 { margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: var(--ink); }
+  #leadCard div { font-size: 13px; color: var(--ink-soft); margin-bottom: 3px; }
+  #restartNotice { margin-top: 12px; color: var(--accent); font-size: 13px; display: none; }
+
+  /* ---------- Admin modal ---------- */
+  #adminOverlay {
+    display: none; position: fixed; inset: 0; background: rgba(20,20,20,0.45);
+    align-items: center; justify-content: center; z-index: 100; padding: 16px;
+  }
+  #adminModal { background: var(--canvas); border-radius: 24px; padding: 28px; width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto; }
+  #adminModal h2 { font-size: 18px; font-weight: 650; margin: 0 0 4px 0; }
+  #adminModal p.hint { font-size: 12px; color: var(--text-muted); margin: 0 0 14px 0; line-height: 1.5; }
+  #adminModal input, #adminModal textarea {
+    width: 100%; padding: 11px 14px; margin-top: 6px; margin-bottom: 14px;
+    border-radius: 16px; border: none; background: var(--field); color: var(--ink);
+    font-family: var(--font); font-size: 14px; outline: none;
+  }
+  #adminModal input:focus, #adminModal textarea:focus { box-shadow: inset 0 0 0 2px var(--ink); }
+  #adminModal textarea { min-height: 150px; resize: vertical; }
+  #adminModal label { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+  #loginError { color: #dc2626; font-size: 13px; display: none; margin-top: -8px; margin-bottom: 10px; }
+  .save-status { color: #16a34a; font-size: 13px; display: none; margin-top: -6px; margin-bottom: 8px; }
+
+  .seg-track { display: flex; background: var(--canvas-soft); border-radius: 9999px; padding: 4px; margin-bottom: 18px; gap: 2px; }
+  .seg-btn { flex: 1; padding: 8px 6px; border-radius: 9999px; border: none; background: transparent; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--font); }
+  .seg-btn.active { background: var(--canvas); color: var(--ink); }
+
+  .webhook-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; background: var(--field); border-radius: 12px; padding: 8px 12px; }
+  .webhook-row span { flex: 1; font-size: 12px; color: var(--ink-soft); word-break: break-all; }
+  .webhook-row button { padding: 5px 12px; font-size: 12px; margin: 0; background: #dc2626; color: white; border: none; border-radius: 9999px; cursor: pointer; }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 6px; }
+  .code-block {
+    background: var(--ink); color: #e0e0e0; border-radius: 12px; padding: 12px 14px;
+    font-family: ui-monospace, monospace; font-size: 11.5px; line-height: 1.6;
+    overflow-x: auto; white-space: pre; margin-bottom: 14px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     VOICE PIPELINE MAP
+     ============================================================
+     This app runs in one of two VOICE_MODE values (see CONFIG):
+
+     "browser"  — mic in the visitor's browser tab. STT via Web
+                  Speech API, LLM + TTS via Puter.js (free, no key).
+                  This is what's active by default.
+
+     "phone"    — a real phone number rings the assistant. Requires
+                  a voice AI vendor (Vapi / Retell / Bland) as the
+                  telephony + STT/TTS layer. This static page does
+                  NOT handle phone audio itself — phone calls are
+                  received server-side by api/vapi-webhook.js
+                  (deployed alongside this file as a Vercel
+                  serverless function, same drag-and-drop deploy).
+
+     Swap points, once you're ready to wire a phone number:
+       1. Buy/rent a number + create an Assistant at vapi.ai
+          (or Retell/Bland — same pattern).
+       2. Paste your assistant's system prompt = same text as the
+          "Personality" tab in Admin here, so behavior matches.
+       3. Set the Assistant's Server URL to:
+          https://YOUR-VERCEL-DOMAIN/api/vapi-webhook
+       4. That endpoint (already written, see api/vapi-webhook.js)
+          receives the end-of-call lead data and fans it out to
+          the exact same LEAD_WEBHOOKS list configured below in
+          Admin -> Integrations. No code changes needed there —
+          browser demo and real phone line share one lead pipeline.
+
+     LLM call point (browser mode): handleUserSpeech()
+     TTS point (browser mode):      speak()
+     STT point (browser mode):      startListening()
+     ============================================================ -->
+
+<div class="nav-pill">
+  <div class="nav-title" id="navTitle">Real Estate <span>Voice Assistant</span></div>
+  <div style="display:flex; gap:8px;">
+    <button class="btn btn-outline" onclick="openAdmin()">Admin</button>
+  </div>
+</div>
+<div id="browserWarn">For best microphone support, use Chrome or Edge.</div>
+
+<div class="orb-card">
+  <div class="sphere-stage" id="sphereStage">
+    <div class="sphere-glow"></div>
+    <div class="sphere"></div>
+  </div>
+  <div id="status">Starting…</div>
+  <div class="controls">
+    <button class="btn btn-outline" id="micToggle">Mic: On</button>
+    <button class="btn btn-outline" id="resetBtn">Reset</button>
+  </div>
+</div>
+
+<div id="restartNotice">Lead captured — restarting shortly…</div>
+<div id="transcript"></div>
+
+<div id="leadCard">
+  <h3>Captured lead</h3>
+  <div id="leadFields"></div>
+</div>
+
+<!-- Admin modal -->
+<div id="adminOverlay">
+  <div id="adminModal">
+    <div id="loginPane">
+      <h2>Admin login</h2>
+      <p class="hint">Configure the assistant's personality, CRM destinations, and phone connection.</p>
+      <label>Password</label>
+      <input id="adminPassword" type="password" placeholder="••••••••" />
+      <div id="loginError">Wrong password.</div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="tryLogin()">Log in</button>
+        <button class="btn btn-outline" onclick="closeAdmin()">Cancel</button>
+      </div>
+    </div>
+
+    <div id="editPane" style="display:none;">
+      <div class="seg-track">
+        <button class="seg-btn active" id="tabPersonalityBtn" onclick="showTab('personality')">Personality</button>
+        <button class="seg-btn" id="tabIntegrationsBtn" onclick="showTab('integrations')">Integrations</button>
+        <button class="seg-btn" id="tabPhoneBtn" onclick="showTab('phone')">Phone</button>
+      </div>
+
+      <div id="tabPersonality">
+        <label>Assistant name</label>
+        <input id="botName" type="text" />
+        <label>System prompt (must end with a JSON example line)</label>
+        <textarea id="botPrompt"></textarea>
+        <div class="save-status" id="saveStatus">Saved.</div>
+        <button class="btn btn-primary" onclick="savePersonality()">Save</button>
+      </div>
+
+      <div id="tabIntegrations" style="display:none;">
+        <p class="hint">Every captured lead is POSTed as JSON to every URL below — works with Zapier, Make, n8n, HubSpot, Salesforce, Google Sheets, or any REST endpoint.</p>
+        <div id="webhookList"></div>
+        <label>Add webhook URL</label>
+        <input id="newWebhookUrl" type="text" placeholder="https://hooks.zapier.com/…" />
+        <button class="btn btn-primary" onclick="addWebhook()">Add</button>
+        <div class="save-status" id="webhookSaveStatus">Saved.</div>
+      </div>
+
+      <div id="tabPhone" style="display:none;">
+        <p class="hint">This page is browser-only. To let a real phone number ring this assistant, connect a voice AI vendor — the server endpoint is already built and deployed alongside this page.</p>
+        <label>1. Create an assistant at vapi.ai (or Retell/Bland), paste the same system prompt as the Personality tab.</label>
+        <label>2. Set the assistant's Server URL to:</label>
+        <div class="code-block" id="webhookUrlDisplay">https://YOUR-DOMAIN.vercel.app/api/vapi-webhook</div>
+        <label>3. Leads from real calls land in the exact same Integrations webhooks above — no extra setup.</label>
+      </div>
+
+      <div class="modal-actions" style="margin-top:16px;">
+        <button class="btn btn-outline" onclick="closeAdmin()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   CONFIG
+========================================================= */
+const VOICE_MODE = "browser"; // "browser" (default) or "phone" — see Voice Pipeline Map above
+const DEFAULT_LEAD_WEBHOOKS = [
+  "https://script.google.com/macros/s/AKfycbzz5BwE7PJOlQhgurzJrY_WlXpkX__-zdJ41KREP1Rw0_d1kiRH4OF6wSKLZ78DixgdJg/exec"
+];
+const ADMIN_PASSWORD = "admin123"; // change before sending to a client — visible in page source, demo-grade gate only
+
+const DEFAULT_PERSONALITY = {
+  name: "Real Estate Voice Assistant",
+  prompt: `You are a friendly real estate voice assistant qualifying inbound leads.
+Ask ONE question at a time to collect: name, area/neighborhood, buying or renting,
+budget range, and timeline. Keep replies under 2 short sentences.
+After your reply, on a new line output ONLY JSON:
+{"name":"","area":"","type":"","budget":"","timeline":""}`
+};
+
+function loadPersonality() {
+  const saved = localStorage.getItem('voiceBotPersonality');
+  return saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(DEFAULT_PERSONALITY));
+}
+function savePersonalityToStorage(p) { localStorage.setItem('voiceBotPersonality', JSON.stringify(p)); }
+function loadWebhooks() {
+  const saved = localStorage.getItem('voiceBotWebhooks');
+  return saved ? JSON.parse(saved) : [...DEFAULT_LEAD_WEBHOOKS];
+}
+function saveWebhooksToStorage(list) { localStorage.setItem('voiceBotWebhooks', JSON.stringify(list)); }
+
+let personality = loadPersonality();
+let leadWebhooks = loadWebhooks();
+let requiredFields = [];
+let conversation = [];
+let currentLead = {};
+let recognition = null;
+let paused = false;
+let shouldListen = true;
+let privacyMode = false;
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SR) document.getElementById('browserWarn').style.display = 'block';
+
+const sphereStage = document.getElementById('sphereStage');
+const status = document.getElementById('status');
+const micToggle = document.getElementById('micToggle');
+const resetBtn = document.getElementById('resetBtn');
+const transcriptBox = document.getElementById('transcript');
+const leadCard = document.getElementById('leadCard');
+const leadFields = document.getElementById('leadFields');
+const restartNotice = document.getElementById('restartNotice');
+const navTitle = document.getElementById('navTitle');
+
+function applyHeaderName() {
+  navTitle.innerHTML = personality.name.replace(/^(\S+)\s+(.*)$/, '$1 <span>$2</span>') || personality.name;
+}
+function extractRequiredFields() {
+  const match = personality.prompt.match(/\{[^}]*\}/);
+  requiredFields = match ? Object.keys(JSON.parse(match[0])) : [];
+}
+
+function resetConversation() {
+  extractRequiredFields();
+  conversation = [{ role: 'system', content: personality.prompt }];
+  currentLead = {};
+  transcriptBox.innerHTML = '';
+  leadCard.style.display = 'none';
+  restartNotice.style.display = 'none';
+  greet();
+}
+
+micToggle.addEventListener('click', () => {
+  privacyMode = !privacyMode;
+  if (privacyMode) {
+    micToggle.textContent = 'Mic: Off';
+    setState('privacy');
+    stopListeningHard();
+  } else {
+    micToggle.textContent = 'Mic: On';
+    shouldListen = true;
+    if (!paused) startListening();
+  }
+});
+resetBtn.addEventListener('click', resetConversation);
+
+function setState(state) {
+  sphereStage.className = 'sphere-stage ' + state;
+  const map = { listening: 'Listening…', thinking: 'Thinking…', speaking: 'Speaking…', privacy: 'Privacy mode — mic off' };
+  status.textContent = map[state] || 'Ready';
+}
+
+function addMessage(role, text) {
+  const div = document.createElement('div');
+  div.className = role === 'user' ? 'msg-user' : 'msg-agent';
+  div.innerHTML = `<b>${role === 'user' ? 'You' : 'Agent'}:</b> ${text}`;
+  transcriptBox.appendChild(div);
+  transcriptBox.scrollTop = transcriptBox.scrollHeight;
+}
+function allFieldsFilled() { return requiredFields.length > 0 && requiredFields.every(f => currentLead[f]); }
+
+function updateLeadCard(jsonLine) {
+  try {
+    const data = JSON.parse(jsonLine);
+    currentLead = { ...currentLead, ...data };
+    leadCard.style.display = 'block';
+    leadFields.innerHTML = requiredFields.map(f => `<div>${f}: ${currentLead[f] || '—'}</div>`).join('');
+    if (allFieldsFilled()) {
+      restartNotice.style.display = 'block';
+      shouldListen = false;
+      submitLead();
+      setTimeout(resetConversation, 4000);
+    }
+  } catch (e) { /* no valid json yet */ }
+}
+
+/* ---------- Lead -> any connected CRM/workflow tool (shared with phone mode) ---------- */
+async function submitLead() {
+  if (!leadWebhooks || leadWebhooks.length === 0) { console.warn('No webhooks configured. Lead not sent:', currentLead); return; }
+  const payload = JSON.stringify({ timestamp: new Date().toISOString(), source: 'browser_demo', ...currentLead });
+  await Promise.all(leadWebhooks.map(async (url) => {
+    try { await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: payload }); }
+    catch (e) { console.error('Webhook send failed for', url, e); }
+  }));
+}
+
+/* ---------- TTS swap point ---------- */
+async function speak(text) {
+  setState('speaking');
+  try {
+    const audio = await puter.ai.txt2speech(text, { voice: 'Joanna', engine: 'neural' });
+    await new Promise((resolve) => { audio.onended = resolve; audio.onerror = resolve; audio.play(); });
+  } catch (err) {
+    await new Promise((resolve) => {
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.onend = resolve;
+      speechSynthesis.speak(utter);
+    });
+  }
+}
+
+/* ---------- LLM call swap point ---------- */
+async function handleUserSpeech(userText) {
+  addMessage('user', userText);
+  conversation.push({ role: 'user', content: userText });
+  paused = true;
+  setState('thinking');
+  try {
+    const response = await puter.ai.chat(conversation, { model: 'gpt-4o-mini' });
+    const fullText = response.message?.content || response.toString();
+    const lines = fullText.trim().split('\n');
+    let jsonLine = '', spokenLines = [];
+    for (const line of lines) { if (line.trim().startsWith('{')) jsonLine = line.trim(); else spokenLines.push(line); }
+    const spokenText = spokenLines.join(' ').trim();
+    addMessage('agent', spokenText);
+    conversation.push({ role: 'assistant', content: fullText });
+    if (jsonLine) updateLeadCard(jsonLine);
+    await speak(spokenText);
+  } catch (err) {
+    const msg = "Sorry, I had trouble with that — could you repeat?";
+    addMessage('agent', msg);
+    await speak(msg);
+  }
+  paused = false;
+  if (shouldListen && !privacyMode) startListening();
+}
+
+/* ---------- STT swap point ---------- */
+function startListening() {
+  if (!SR || privacyMode) return;
+  recognition = new SR();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+  recognition.onstart = () => setState('listening');
+  recognition.onresult = (e) => {
+    const text = e.results[e.results.length - 1][0].transcript.trim();
+    if (text) handleUserSpeech(text);
+  };
+  recognition.onerror = (e) => { if (e.error !== 'no-speech' && e.error !== 'aborted') console.error(e); };
+  recognition.onend = () => { if (shouldListen && !paused && !privacyMode) { try { recognition.start(); } catch (e) {} } };
+  try { recognition.start(); } catch (e) {}
+}
+function stopListeningHard() { if (recognition) { recognition.onend = null; recognition.stop(); } }
+
+async function greet() {
+  const greeting = "Hi! Thanks for reaching out — how can I help you today?";
+  addMessage('agent', greeting);
+  conversation.push({ role: 'assistant', content: greeting });
+  await speak(greeting);
+  shouldListen = true;
+  if (!privacyMode) startListening();
+}
+
+/* =========================================================
+   ADMIN PANEL — client-side gate only (demo-grade, password
+   is visible in page source — not production security)
+========================================================= */
+let isAdminUnlocked = false;
+function openAdmin() {
+  document.getElementById('adminOverlay').style.display = 'flex';
+  document.getElementById('webhookUrlDisplay').textContent = window.location.origin + '/api/vapi-webhook';
+  if (isAdminUnlocked) showEditPane();
+  else { document.getElementById('loginPane').style.display = 'block'; document.getElementById('editPane').style.display = 'none'; }
+}
+function closeAdmin() { document.getElementById('adminOverlay').style.display = 'none'; }
+function tryLogin() {
+  const pw = document.getElementById('adminPassword').value;
+  if (pw === ADMIN_PASSWORD) { isAdminUnlocked = true; document.getElementById('loginError').style.display = 'none'; showEditPane(); }
+  else { document.getElementById('loginError').style.display = 'block'; }
+}
+function showEditPane() {
+  document.getElementById('loginPane').style.display = 'none';
+  document.getElementById('editPane').style.display = 'block';
+  document.getElementById('botName').value = personality.name;
+  document.getElementById('botPrompt').value = personality.prompt;
+  showTab('personality');
+}
+function savePersonality() {
+  personality.name = document.getElementById('botName').value || DEFAULT_PERSONALITY.name;
+  personality.prompt = document.getElementById('botPrompt').value || DEFAULT_PERSONALITY.prompt;
+  savePersonalityToStorage(personality);
+  applyHeaderName();
+  resetConversation();
+  flashStatus('saveStatus');
+}
+function showTab(tab) {
+  document.getElementById('tabPersonality').style.display = tab === 'personality' ? 'block' : 'none';
+  document.getElementById('tabIntegrations').style.display = tab === 'integrations' ? 'block' : 'none';
+  document.getElementById('tabPhone').style.display = tab === 'phone' ? 'block' : 'none';
+  document.getElementById('tabPersonalityBtn').classList.toggle('active', tab === 'personality');
+  document.getElementById('tabIntegrationsBtn').classList.toggle('active', tab === 'integrations');
+  document.getElementById('tabPhoneBtn').classList.toggle('active', tab === 'phone');
+  if (tab === 'integrations') renderWebhookList();
+}
+function renderWebhookList() {
+  const list = document.getElementById('webhookList');
+  if (leadWebhooks.length === 0) { list.innerHTML = '<div style="color:var(--text-muted); font-size:12px; margin-bottom:10px;">No webhooks configured — leads will not be sent anywhere.</div>'; return; }
+  list.innerHTML = leadWebhooks.map((url, i) => `<div class="webhook-row"><span>${url}</span><button onclick="removeWebhook(${i})">Remove</button></div>`).join('');
+}
+function addWebhook() {
+  const input = document.getElementById('newWebhookUrl');
+  const url = input.value.trim();
+  if (!url) return;
+  if (!/^https?:\/\//i.test(url)) { alert('URL must start with http:// or https://'); return; }
+  leadWebhooks.push(url);
+  saveWebhooksToStorage(leadWebhooks);
+  input.value = '';
+  renderWebhookList();
+  flashStatus('webhookSaveStatus');
+}
+function removeWebhook(index) {
+  leadWebhooks.splice(index, 1);
+  saveWebhooksToStorage(leadWebhooks);
+  renderWebhookList();
+  flashStatus('webhookSaveStatus');
+}
+function flashStatus(id) {
+  const el = document.getElementById(id);
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 2000);
+}
+
+/* ---------- Boot ---------- */
+applyHeaderName();
+resetConversation();
+</script>
+</body>
+</html>
